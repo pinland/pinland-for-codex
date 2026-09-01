@@ -1,0 +1,20 @@
+{
+  "name": "pinland",
+  "interface": {
+    "displayName": "Pinland"
+  },
+  "plugins": [
+    {
+      "name": "pinland-for-codex",
+      "source": {
+        "source": "local",
+        "path": "./plugins/pinland-for-codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

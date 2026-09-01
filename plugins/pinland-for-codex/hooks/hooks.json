@@ -1,0 +1,80 @@
+{
+  "description": "Send Codex task lifecycle events to the local Pinland app.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/zsh -c 'root=${PLUGIN_ROOT:-}; candidates=(); if [[ -n \"$root\" && \"${root:h:t}\" == pinland-for-codex ]]; then candidates=(\"${root:h}\"/*(N/om)); elif [[ ! -f \"$root/scripts/pinland-hook.zsh\" ]]; then codex_home=${CODEX_HOME:-${HOME:-}/.codex}; candidates=(\"$codex_home\"/plugins/cache/*/pinland-for-codex/*(N/om)); fi; for candidate in \"${candidates[@]}\"; do if [[ -f \"$candidate/scripts/pinland-hook.zsh\" ]]; then root=$candidate; break; fi; done; [[ -f \"$root/scripts/pinland-hook.zsh\" ]] || exit 0; PLUGIN_ROOT=\"$root\" exec /bin/zsh \"$root/scripts/pinland-hook.zsh\" \"$1\"' pinland-hook lifecycle",
+            "async": true,
+            "timeout": 12
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/zsh -c 'root=${PLUGIN_ROOT:-}; candidates=(); if [[ -n \"$root\" && \"${root:h:t}\" == pinland-for-codex ]]; then candidates=(\"${root:h}\"/*(N/om)); elif [[ ! -f \"$root/scripts/pinland-hook.zsh\" ]]; then codex_home=${CODEX_HOME:-${HOME:-}/.codex}; candidates=(\"$codex_home\"/plugins/cache/*/pinland-for-codex/*(N/om)); fi; for candidate in \"${candidates[@]}\"; do if [[ -f \"$candidate/scripts/pinland-hook.zsh\" ]]; then root=$candidate; break; fi; done; [[ -f \"$root/scripts/pinland-hook.zsh\" ]] || exit 0; PLUGIN_ROOT=\"$root\" exec /bin/zsh \"$root/scripts/pinland-hook.zsh\" \"$1\"' pinland-hook manual-pin",
+            "statusMessage": "Pinning this task to Pinland",
+            "timeout": 12
+          },
+          {
+            "type": "command",
+            "command": "/bin/zsh -c 'root=${PLUGIN_ROOT:-}; candidates=(); if [[ -n \"$root\" && \"${root:h:t}\" == pinland-for-codex ]]; then candidates=(\"${root:h}\"/*(N/om)); elif [[ ! -f \"$root/scripts/pinland-hook.zsh\" ]]; then codex_home=${CODEX_HOME:-${HOME:-}/.codex}; candidates=(\"$codex_home\"/plugins/cache/*/pinland-for-codex/*(N/om)); fi; for candidate in \"${candidates[@]}\"; do if [[ -f \"$candidate/scripts/pinland-hook.zsh\" ]]; then root=$candidate; break; fi; done; [[ -f \"$root/scripts/pinland-hook.zsh\" ]] || exit 0; PLUGIN_ROOT=\"$root\" exec /bin/zsh \"$root/scripts/pinland-hook.zsh\" \"$1\"' pinland-hook lifecycle",
+            "async": true,
+            "timeout": 6
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/zsh -c 'root=${PLUGIN_ROOT:-}; candidates=(); if [[ -n \"$root\" && \"${root:h:t}\" == pinland-for-codex ]]; then candidates=(\"${root:h}\"/*(N/om)); elif [[ ! -f \"$root/scripts/pinland-hook.zsh\" ]]; then codex_home=${CODEX_HOME:-${HOME:-}/.codex}; candidates=(\"$codex_home\"/plugins/cache/*/pinland-for-codex/*(N/om)); fi; for candidate in \"${candidates[@]}\"; do if [[ -f \"$candidate/scripts/pinland-hook.zsh\" ]]; then root=$candidate; break; fi; done; [[ -f \"$root/scripts/pinland-hook.zsh\" ]] || exit 0; PLUGIN_ROOT=\"$root\" exec /bin/zsh \"$root/scripts/pinland-hook.zsh\" \"$1\"' pinland-hook lifecycle",
+            "async": true,
+            "timeout": 6
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/zsh -c 'root=${PLUGIN_ROOT:-}; candidates=(); if [[ -n \"$root\" && \"${root:h:t}\" == pinland-for-codex ]]; then candidates=(\"${root:h}\"/*(N/om)); elif [[ ! -f \"$root/scripts/pinland-hook.zsh\" ]]; then codex_home=${CODEX_HOME:-${HOME:-}/.codex}; candidates=(\"$codex_home\"/plugins/cache/*/pinland-for-codex/*(N/om)); fi; for candidate in \"${candidates[@]}\"; do if [[ -f \"$candidate/scripts/pinland-hook.zsh\" ]]; then root=$candidate; break; fi; done; [[ -f \"$root/scripts/pinland-hook.zsh\" ]] || exit 0; PLUGIN_ROOT=\"$root\" exec /bin/zsh \"$root/scripts/pinland-hook.zsh\" \"$1\"' pinland-hook lifecycle",
+            "statusMessage": "Waiting for Pinland approval"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/zsh -c 'root=${PLUGIN_ROOT:-}; candidates=(); if [[ -n \"$root\" && \"${root:h:t}\" == pinland-for-codex ]]; then candidates=(\"${root:h}\"/*(N/om)); elif [[ ! -f \"$root/scripts/pinland-hook.zsh\" ]]; then codex_home=${CODEX_HOME:-${HOME:-}/.codex}; candidates=(\"$codex_home\"/plugins/cache/*/pinland-for-codex/*(N/om)); fi; for candidate in \"${candidates[@]}\"; do if [[ -f \"$candidate/scripts/pinland-hook.zsh\" ]]; then root=$candidate; break; fi; done; [[ -f \"$root/scripts/pinland-hook.zsh\" ]] || exit 0; PLUGIN_ROOT=\"$root\" exec /bin/zsh \"$root/scripts/pinland-hook.zsh\" \"$1\"' pinland-hook lifecycle",
+            "timeout": 12
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/zsh -c 'root=${PLUGIN_ROOT:-}; candidates=(); if [[ -n \"$root\" && \"${root:h:t}\" == pinland-for-codex ]]; then candidates=(\"${root:h}\"/*(N/om)); elif [[ ! -f \"$root/scripts/pinland-hook.zsh\" ]]; then codex_home=${CODEX_HOME:-${HOME:-}/.codex}; candidates=(\"$codex_home\"/plugins/cache/*/pinland-for-codex/*(N/om)); fi; for candidate in \"${candidates[@]}\"; do if [[ -f \"$candidate/scripts/pinland-hook.zsh\" ]]; then root=$candidate; break; fi; done; [[ -f \"$root/scripts/pinland-hook.zsh\" ]] || exit 0; PLUGIN_ROOT=\"$root\" exec /bin/zsh \"$root/scripts/pinland-hook.zsh\" \"$1\"' pinland-hook lifecycle",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

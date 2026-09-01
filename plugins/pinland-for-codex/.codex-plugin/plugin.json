@@ -1,0 +1,35 @@
+{
+  "name": "pinland-for-codex",
+  "version": "0.1.0+codex.20260901175924",
+  "description": "Pin Codex tasks to Pinland, continue them from the notch, and receive completion or approval alerts.",
+  "author": {
+    "name": "Pinland",
+    "url": "https://memex-api.xyz/pinland/"
+  },
+  "homepage": "https://memex-api.xyz/pinland/",
+  "repository": "https://github.com/pinland/pinland-for-codex",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Pinland for Codex",
+    "shortDescription": "Pin Codex tasks in your notch",
+    "longDescription": "Pin tasks with Codex's native sidebar action and Pinland mirrors that chosen set, order, and a bounded recent conversation preview locally. Continue a pinned task from its notch card, or receive privacy-conscious status, completion, and approval events.",
+    "developerName": "Pinland",
+    "category": "Productivity",
+    "capabilities": [
+      "Sync native Codex pins",
+      "Preview recent final conversation",
+      "Continue a pinned task from Pinland",
+      "Track pinned Codex task status",
+      "Relay approval requests"
+    ],
+    "websiteURL": "https://memex-api.xyz/pinland/",
+    "privacyPolicyURL": "https://memex-api.xyz/pinland/privacy/",
+    "defaultPrompt": [
+      "Pin this task to Pinland."
+    ],
+    "brandColor": "#F15E42",
+    "composerIcon": "./assets/pinland.svg",
+    "logo": "./assets/pinland.svg"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "pinland-native-pins-sync": {
+      "command": "/bin/zsh",
+      "args": [
+        "-c",
+        "root=${PLUGIN_ROOT:-}; candidates=(); if [[ -n \"$root\" && \"${root:h:t}\" == pinland-for-codex ]]; then candidates=(\"${root:h}\"/*(N/om)); elif [[ ! -x \"$root/scripts/launch-pinland-mcp\" ]]; then codex_home=${CODEX_HOME:-${HOME:-}/.codex}; candidates=(\"$codex_home\"/plugins/cache/*/pinland-for-codex/*(N/om)); fi; for candidate in \"${candidates[@]}\"; do if [[ -x \"$candidate/scripts/launch-pinland-mcp\" && -f \"$candidate/mcp/pins-sync-server.mjs\" ]]; then root=$candidate; break; fi; done; [[ -x \"$root/scripts/launch-pinland-mcp\" && -f \"$root/mcp/pins-sync-server.mjs\" ]] || exit 127; PLUGIN_ROOT=\"$root\" exec \"$root/scripts/launch-pinland-mcp\" \"$root/mcp/pins-sync-server.mjs\"",
+        "pinland-native-pins-sync"
+      ],
+      "enabled": true,
+      "env_vars": [
+        "CODEX_APP_TOOLS_PIPE_PATH",
+        "CODEX_MCP_NODE_PATH",
+        "CODEX_ELECTRON_RESOURCES_PATH",
+        "CODEX_CLI_PATH",
+        "CODEX_HOME",
+        "PLUGIN_DATA",
+        "PLUGIN_ROOT",
+        "XDG_CACHE_HOME",
+        "HOME"
+      ],
+      "startup_timeout_sec": 10
+    }
+  }
+}
