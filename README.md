@@ -13,9 +13,20 @@ alerts, explicit message sending, and supported approval prompts.
 Older Codex versions can still use the plugin's **Pin this task to Pinland**
 compatibility action.
 
-## Install from GitHub
+## Install from Pinland
 
-Add this repository as a Codex plugin marketplace, then install the plugin:
+Current Pinland builds include a signed snapshot of this public plugin. Open
+**Pinland Settings**, choose **Install & Connect**, then review and confirm the
+standard Codex plugin screen once. Pairing and pinned-task synchronization
+finish automatically; there is no token to copy and no configuration file to
+edit.
+
+After setup, use Codex's normal sidebar **Pin** action to choose the tasks that
+should appear in Pinland.
+
+## Manual GitHub install
+
+Developers can instead add this repository as a Codex plugin marketplace:
 
 ```bash
 codex plugin marketplace add pinland/pinland-for-codex
@@ -24,8 +35,6 @@ codex plugin add pinland-for-codex@pinland
 
 Restart the ChatGPT desktop app, open Pinland Settings, and choose **Connect**
 beside Codex. Codex will ask you to review and trust the plugin's local hooks.
-After that, use Codex's normal sidebar **Pin** action to choose the tasks that
-should appear in Pinland.
 
 ## Privacy and security
 

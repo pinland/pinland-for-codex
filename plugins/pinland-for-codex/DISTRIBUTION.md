@@ -9,8 +9,10 @@ codex plugin marketplace add pinland/pinland-for-codex
 codex plugin add pinland-for-codex@pinland
 ```
 
-Pinland's **Connect** button may guide users to this repository, but it must not
-claim the plugin was installed automatically.
+Pinland's **Install & Connect** button opens Codex's standard plugin screen for
+the signed snapshot bundled with the app. The user must still review and
+confirm once; Pinland must not claim installation completed before that Codex
+confirmation.
 
 Before enabling the feature in an App Store release:
 
@@ -20,8 +22,9 @@ Before enabling the feature in an App Store release:
 3. After approval, set `AppLinks.codexPluginInstallURL` to the exact public URL
    returned by OpenAI; do not derive one from the package namespace.
 4. On a clean Mac user account, install Pinland from the App Store.
-5. Choose **Connect** in Pinland Settings, install the plugin, and accept Codex's
-   required hook trust review.
+5. Choose **Install & Connect** in Pinland Settings and accept Codex's required
+   hook trust review. Verify there is no Terminal command, copied token, or
+   configuration-file edit in the end-user flow.
 6. Start an unpinned control task and verify that it never appears in Pinland.
 7. Pin one Codex App task with Codex's native sidebar action. Without sending a
    prompt, verify it appears in Pinland, then verify native reorder and unpin

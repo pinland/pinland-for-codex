@@ -2,10 +2,21 @@
 
 This plugin connects Codex App and Codex CLI tasks to the local Pinland Mac app.
 
-## GitHub marketplace installation
+## Install from Pinland
 
-Until the public Plugins Directory listing is approved, install this package
-from the Pinland GitHub marketplace:
+Current Pinland builds provide the normal setup in two actions:
+
+1. Open Pinland Settings and choose **Install & Connect**.
+2. Review and confirm the standard Codex plugin screen once.
+
+Pinland opens the signed plugin snapshot included in the app bundle. Pairing
+then finishes automatically, with no Terminal command, copied token, or
+configuration-file edit. Use Codex's normal sidebar **Pin** action on any task
+worth keeping.
+
+## Manual GitHub marketplace installation
+
+Developers can install the same public package directly from GitHub:
 
 ```bash
 codex plugin marketplace add pinland/pinland-for-codex
@@ -14,14 +25,6 @@ codex plugin add pinland-for-codex@pinland
 
 Restart the ChatGPT desktop app after installation, then open Pinland Settings
 and choose **Connect** beside Codex.
-
-The normal setup is intentionally short:
-
-1. Open Pinland Settings and choose **Connect** beside Codex.
-2. Install Pinland for Codex from the Plugins Directory and approve Codex's
-   required hook trust review.
-3. Use Codex's normal sidebar **Pin** action on any task worth keeping.
-   Pairing and synchronization happen automatically.
 
 Pinland mirrors only Codex's native Pinned section, including unpinning and
 manual ordering. Other new tasks stay out of the notch. Removing a card only
@@ -74,7 +77,7 @@ command ledger live in the plugin's private data directory so they survive a
 normal app or Mac restart. If Pinland is unavailable, the plugin makes no
 decision and Codex keeps its native completion and approval behavior.
 
-The public Plugins Directory remains the intended zero-configuration install
-path. This GitHub marketplace is the supported fallback while that listing is
-under review; it requires the two one-time Codex CLI commands above, but never a
-copied token or a configuration-file edit.
+The public Plugins Directory remains the intended hosted install path. While
+that listing is under review, Pinland's signed bundled snapshot is the normal
+end-user path and this GitHub marketplace is the transparent source and manual
+developer fallback.
