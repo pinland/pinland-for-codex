@@ -70,7 +70,8 @@ test("every hook resolves the newest sibling cache before launching", () => {
 test("MCP launcher survives an old cached cwd and root", () => {
   const { codexHome, currentRoot, oldRoot, home } = makeUpgradeFixture();
   const capture = path.join(home, "mcp-capture");
-  const server = mcpConfig.mcpServers["pinland-native-pins-sync"];
+  assert.deepEqual(Object.keys(mcpConfig.mcpServers), ["pinland"]);
+  const server = mcpConfig.mcpServers.pinland;
 
   assert.equal(server.command, "/bin/zsh");
   assert.equal(Object.hasOwn(server, "cwd"), false);
@@ -90,6 +91,6 @@ test("MCP launcher survives an old cached cwd and root", () => {
 });
 
 test("MCP accepts the host-provided Codex Desktop task-messaging pipe", () => {
-  const server = mcpConfig.mcpServers["pinland-native-pins-sync"];
+  const server = mcpConfig.mcpServers.pinland;
   assert.equal(server.env_vars.includes("CODEX_APP_TOOLS_PIPE_PATH"), true);
 });

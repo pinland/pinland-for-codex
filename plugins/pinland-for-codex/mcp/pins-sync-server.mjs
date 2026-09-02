@@ -129,7 +129,7 @@ function handleMCPMessage(message) {
       mcpResult(message.id, {
         protocolVersion: message.params?.protocolVersion || "2025-06-18",
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "pinland-native-pins-sync", version: "0.1.0" }
+        serverInfo: { name: "pinland", version: "0.1.0" }
       });
       break;
     case "ping":
@@ -879,7 +879,7 @@ async function readPinnedSessions(
   return boundedPinnedSessions(sessionsWithExternalApprovals);
 }
 
-async function createAppServerClient(token, clientName = "pinland-native-pins-sync") {
+async function createAppServerClient(token, clientName = "pinland") {
   const executable = resolveCodexExecutable();
   if (!executable) throw new Error("Codex executable is unavailable");
   const client = new CodexAppServerClient(

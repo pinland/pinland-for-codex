@@ -45,7 +45,7 @@ export class CodexAppServerClient {
     this.forceKillGraceMilliseconds = Number.isFinite(options.forceKillGraceMilliseconds)
       ? Math.max(0, options.forceKillGraceMilliseconds)
       : DEFAULT_FORCE_KILL_GRACE_MS;
-    this.clientName = nonemptyString(options.clientName) || "pinland-native-pins-sync";
+    this.clientName = nonemptyString(options.clientName) || "pinland";
     this.child = undefined;
     this.output = undefined;
     this.nextRequestID = 1;
