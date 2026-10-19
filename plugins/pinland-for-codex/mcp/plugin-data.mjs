@@ -6,6 +6,26 @@ const TOKEN_PATTERN = /^[0-9a-f]{64}$/i;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const REVISION_PATTERN = /^[1-9][0-9]{0,15}$/;
 
+export function pairedPluginToken(directory) {
+  try {
+    const stat = fs.lstatSync(directory);
+    if (!stat.isDirectory() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0
+        || (process.getuid && stat.uid !== process.getuid())) return undefined;
+    for (const [name, limit] of [["bridge-token", 1024], ["paired", 16]]) {
+      const file = fs.lstatSync(path.join(directory, name));
+      if (!file.isFile() || file.isSymbolicLink() || file.size > limit || (file.mode & 0o077) !== 0
+          || (process.getuid && file.uid !== process.getuid())) return undefined;
+    }
+    const token = fs.readFileSync(path.join(directory, "bridge-token"), "utf8").trim();
+    return TOKEN_PATTERN.test(token) ? token : undefined;
+  } catch { return undefined; }
+}
+
+export function pluginDataHasSamePairing(left, right) {
+  const token = pairedPluginToken(left);
+  return Boolean(token && token === pairedPluginToken(right));
+}
+
 export function resolvePluginDataDirectory(environment = process.env, options = {}) {
   if (typeof environment.PLUGIN_DATA === "string"
       && environment.PLUGIN_DATA.trim()) {
@@ -19,6 +39,11 @@ export function resolvePluginDataDirectory(environment = process.env, options = 
     && environment.CODEX_HOME.trim()
     ? environment.CODEX_HOME
     : path.join(homeDirectory, ".codex");
+  // A CLI/older MCP invocation can omit PLUGIN_DATA after Desktop has moved the
+  // plugin to its native data directory. Do not start a second independent
+  // daemon/leader beside that already paired installation.
+  const installedData = path.join(codexHome, "plugins", "data", "pinland-for-codex-pinland");
+  if (pairedPluginToken(installedData)) return installedData;
   return path.join(codexHome, "plugin-data", "pinland-for-codex");
 }
 

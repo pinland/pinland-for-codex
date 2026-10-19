@@ -37,10 +37,19 @@ import { LegacyHistoryTailTracker } from "./legacy-history-tail.mjs";
 import {
   migrateLegacyPluginData,
   preparePluginDataDirectory,
+  previousPluginDataDirectory,
   resolvePluginDataDirectory
 } from "./plugin-data.mjs";
+import { mirrorLegacyPluginLease } from "./plugin-data-lease.mjs";
 import { NativePinSnapshotSyncState } from "./snapshot-sync-state.mjs";
+import { SyncDiagnosticsReporter, syncFailureCode } from "./sync-diagnostics.mjs";
 import { CodexAppServerClient } from "./codex-app-server-client.mjs";
+import { CodexExecutableResolver } from "./codex-executable.mjs";
+import { PluginUpdateSync, pluginIdentity } from "./plugin-update.mjs";
+import { PluginUpdateJournal } from "./plugin-update-journal.mjs";
+import { installedPluginForHandoff, startInstalledCompanion } from "./plugin-handoff.mjs";
+import { AccountUsageSync } from "./account-usage.mjs";
+import { DesktopQuestionBridge } from "./desktop-question-bridge.mjs";
 import {
   desktopToolsPipeForInvocation,
   detachedDaemonEnvironment
@@ -73,8 +82,10 @@ const MAX_BRIDGE_RESPONSE_BYTES = 64 * 1_024;
 const BRIDGE_EPOCH_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const invocationMode = process.argv[2] || "--mcp";
 const serverPath = fileURLToPath(import.meta.url);
+const runningPluginIdentity = pluginIdentity(path.resolve(path.dirname(serverPath), ".."));
 const ownerToken = randomUUID();
 const dataDir = resolvePluginDataDirectory();
+const previousDataDir = previousPluginDataDirectory();
 const tokenPath = path.join(dataDir, "bridge-token");
 const pairedPath = path.join(dataDir, "paired");
 const revisionPath = path.join(dataDir, "pins-revision");
@@ -89,6 +100,7 @@ preparePluginDataDirectory(dataDir);
 migrateLegacyPluginData(dataDir);
 
 let shuttingDown = false;
+let retiringForUpgrade = false;
 let isLeader = false;
 let leaderHeartbeatTimer;
 let followerTimer;
@@ -97,6 +109,8 @@ let daemonHostTimer;
 let ownsDaemonLease = false;
 let syncLoopPromise;
 let activeAppServer;
+const codexExecutable = new CodexExecutableResolver();
+const desktopQuestions = new DesktopQuestionBridge({ bridgeRequest });
 let lastWakeAt = 0;
 let daemonStartedAt = Date.now();
 let lastDesktopSeenAt = 0;
@@ -205,6 +219,7 @@ function touchActivityMarker() {
 
 function daemonOwnerIsHealthy(owner = readJSON(daemonOwnerPath)) {
   return daemonLeaseDisposition(owner, {
+    pluginVersion: runningPluginIdentity.version,
     age: fileAge(daemonOwnerPath),
     staleMilliseconds: DAEMON_STALE_MS,
     processIsAlive
@@ -248,11 +263,13 @@ function acquireDaemonLease() {
       fs.mkdirSync(daemonDir, { mode: 0o700 });
       fs.writeFileSync(daemonOwnerPath, JSON.stringify({
         protocol_version: DAEMON_PROTOCOL_VERSION,
+        plugin_version: runningPluginIdentity.version,
         token: ownerToken,
         pid: process.pid,
         started_at_ms: daemonStartedAt
       }), { mode: 0o600 });
       ownsDaemonLease = true;
+      mirrorLegacyPluginLease(dataDir, previousDataDir, "native-pins-sync-daemon");
       return true;
     } catch (error) {
       if (error?.code !== "EEXIST") return false;
@@ -260,6 +277,7 @@ function acquireDaemonLease() {
 
     const owner = readJSON(daemonOwnerPath);
     const disposition = daemonLeaseDisposition(owner, {
+      pluginVersion: runningPluginIdentity.version,
       age: owner ? fileAge(daemonOwnerPath) : fileAge(daemonDir),
       staleMilliseconds: DAEMON_STALE_MS,
       processIsAlive
@@ -353,12 +371,13 @@ async function checkDaemonLifetime() {
 function startDaemonLeaseHeartbeat() {
   daemonHeartbeatTimer = setInterval(() => {
     if (readJSON(daemonOwnerPath)?.token !== ownerToken) {
-      shutdown(0);
+      retireForUpgrade();
       return;
     }
     try {
       const now = new Date();
       fs.utimesSync(daemonOwnerPath, now, now);
+      mirrorLegacyPluginLease(dataDir, previousDataDir, "native-pins-sync-daemon");
     } catch {
       shutdown(0);
     }
@@ -413,7 +432,10 @@ function bridgeRequest(requestPath, token, body, timeout = 1_200) {
             && BRIDGE_EPOCH_PATTERN.test(rawEpoch)
           ? rawEpoch.toLowerCase()
           : undefined;
-        finish({ status: response.statusCode ?? 0, json, bridgeEpoch });
+        const rawRecovery = response.headers["x-pinland-recovery-epoch"];
+        const recoveryEpoch = typeof rawRecovery === "string" && BRIDGE_EPOCH_PATTERN.test(rawRecovery)
+          ? rawRecovery.toLowerCase() : undefined;
+        finish({ status: response.statusCode ?? 0, json, bridgeEpoch, recoveryEpoch });
       });
     });
     request.setTimeout(timeout, () => request.destroy());
@@ -451,6 +473,7 @@ async function forwardApprovalToBridge(token, approval) {
 }
 
 async function dispatchDirectInstruction(command) {
+  if (retiringForUpgrade || shuttingDown) return { accepted: false, error_code: "codex_unavailable" };
   // The ledger is an idempotency receipt, never an outbox: it contains no
   // prompt and cannot dispatch anything on its own. Every invocation below is
   // caused by exactly one live POST from the Pinland composer.
@@ -638,28 +661,6 @@ function rotateSourceID() {
   fs.writeFileSync(temporaryPath, sourceID, { mode: 0o600 });
   fs.renameSync(temporaryPath, sourceIDPath);
   return sourceID;
-}
-
-function executableCandidates() {
-  return [...new Set([
-    process.env.CODEX_CLI_PATH?.startsWith("/")
-      ? process.env.CODEX_CLI_PATH
-      : undefined,
-    "/Applications/ChatGPT.app/Contents/Resources/codex",
-    "/Applications/Codex.app/Contents/Resources/codex"
-  ].filter(Boolean))];
-}
-
-function resolveCodexExecutable() {
-  for (const candidate of executableCandidates()) {
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      return candidate;
-    } catch {
-      // Try the next host-provided location.
-    }
-  }
-  return undefined;
 }
 
 async function listAll(client, method, baseParams, maximumItems) {
@@ -880,7 +881,7 @@ async function readPinnedSessions(
 }
 
 async function createAppServerClient(token, clientName = "pinland") {
-  const executable = resolveCodexExecutable();
+  const executable = await codexExecutable.resolve();
   if (!executable) throw new Error("Codex executable is unavailable");
   const client = new CodexAppServerClient(
     executable,
@@ -905,19 +906,56 @@ async function runSyncLoop() {
   const legacyHistoryTracker = new LegacyHistoryTailTracker();
   const externalApprovalTracker = new ExternalApprovalSnapshotTracker();
   const snapshotSyncState = new NativePinSnapshotSyncState(nextRevision);
-  while (isLeader && !shuttingDown) {
+  const ownsSync = () => isLeader && !shuttingDown && currentLeaderOwner()?.token === ownerToken;
+  const producer = { runtime_id: ownerToken, plugin_version: runningPluginIdentity.version };
+  const syncRequest = (route, token, body) => ownsSync()
+    ? bridgeRequest(route, token, { ...body, ...producer }) : Promise.resolve({ status: 409 });
+  const diagnostics = new SyncDiagnosticsReporter(syncRequest);
+  const accountUsage = new AccountUsageSync();
+  const pluginUpdate = new PluginUpdateSync({ identity: runningPluginIdentity,
+    protocolVersion: DAEMON_PROTOCOL_VERSION, runtimeID: ownerToken, isOwner: ownsSync,
+    hasOwnedTasks: () => instructionOwnerCapacity.activeCount > 0,
+    installedForHandoff: installedPluginForHandoff, startCompanion: startInstalledCompanion,
+    journal: new PluginUpdateJournal(path.join(dataDir, "plugin-update-state.json")) });
+  pluginUpdate.setHost(codexExecutable.report("discovering"));
+  let acknowledgedRevision;
+  let pairedToken;
+  let recoveryEpoch;
+  while (ownsSync()) {
     try {
       const token = await ensurePaired();
       if (!token) {
+        desktopQuestions.close();
+        pairedToken = undefined;
         await sleep(2_000);
         continue;
       }
+      pairedToken = token;
+      const bridgeObservation = await bridgeRequest("/v1/health", token, {});
+      if (bridgeObservation.recoveryEpoch && recoveryEpoch !== bridgeObservation.recoveryEpoch) {
+        codexExecutable.reset();
+        if (recoveryEpoch) {
+          // Only the read-only sync client is rebuilt. Never restart Codex,
+          // instruction owners, or replay a user's in-flight message.
+          await activeAppServer?.close();
+          activeAppServer = undefined;
+        }
+        recoveryEpoch = bridgeObservation.recoveryEpoch;
+      }
+      const reportEpoch = recoveryEpoch || bridgeObservation.bridgeEpoch;
       if (!activeAppServer || activeAppServer.closed) {
+        await pluginUpdate.refresh(undefined, bridgeRequest, token, reportEpoch);
+        codexExecutable.setApplicationPath(pluginUpdate.target?.codex_app_path);
         activeAppServer = await createAppServerClient(token);
+        pluginUpdate.setHost(codexExecutable.report("ready"));
         restartDelay = 1_000;
       }
 
-      const bridgeObservation = await bridgeRequest("/v1/health", token, {});
+      if (bridgeObservation.status === 204) {
+        pluginUpdate.refresh(activeAppServer, bridgeRequest, token, reportEpoch);
+        accountUsage.refresh(activeAppServer, syncRequest, token, reportEpoch);
+      }
+      diagnostics.observeBridge(bridgeObservation.bridgeEpoch);
       snapshotSyncState.observeBridge(
         bridgeObservation.status,
         bridgeObservation.bridgeEpoch
@@ -930,6 +968,7 @@ async function runSyncLoop() {
         legacyHistoryTracker,
         externalApprovalTracker
       );
+      if (!ownsSync()) break; // An old in-flight read must not publish after takeover.
       const canonical = JSON.stringify(sessions);
       const hash = createHash("sha256").update(canonical).digest("hex");
       const pendingSnapshot = snapshotSyncState.snapshotFor(
@@ -938,7 +977,7 @@ async function runSyncLoop() {
         sessions
       );
       if (pendingSnapshot) {
-        let response = await bridgeRequest(
+        let response = await syncRequest(
           "/v1/pins/snapshot",
           token,
           pendingSnapshot.body
@@ -947,7 +986,7 @@ async function runSyncLoop() {
         if (response.status === 0) {
           wakePinland();
           await sleep(700);
-          response = await bridgeRequest(
+          response = await syncRequest(
             "/v1/pins/snapshot",
             token,
             pendingSnapshot.body
@@ -956,6 +995,7 @@ async function runSyncLoop() {
         }
         if (response.status === 204) {
           snapshotSyncState.acknowledge(hash);
+          acknowledgedRevision = pendingSnapshot.body.revision;
         } else if (response.status === 401) {
           clearPairedMarker();
         } else if (response.status === 409) {
@@ -963,11 +1003,32 @@ async function runSyncLoop() {
           // revision. Rotate producer identity so the next complete snapshot
           // recovers automatically instead of replaying one stale body.
           sourceID = rotateSourceID();
+          acknowledgedRevision = undefined;
           snapshotSyncState.rejectAsStale();
+        } else if (response.status >= 400) {
+          await diagnostics.report(token, sourceID, { failure: "snapshot_rejected" });
         }
       }
+      if (!snapshotSyncState.pendingSnapshot && acknowledgedRevision !== undefined) {
+        const status = await diagnostics.report(token, sourceID, { revision: acknowledgedRevision });
+        if (status === 409) snapshotSyncState.rejectAsStale();
+      }
+      if (bridgeObservation.status === 204 && !snapshotSyncState.pendingSnapshot) {
+        void desktopQuestions.update(sessions.map(session => session.session_id), token, bridgeObservation.bridgeEpoch);
+      } else {
+        desktopQuestions.close();
+      }
       await sleep(POLL_INTERVAL_MS);
-    } catch {
+    } catch (error) {
+      desktopQuestions.close();
+      if (pairedToken) {
+        if (!activeAppServer || activeAppServer.closed) {
+          pluginUpdate.setHost(codexExecutable.report(error.message === "Codex executable is unavailable"
+            ? "executable_missing" : "start_failed"));
+          await pluginUpdate.refresh(undefined, bridgeRequest, pairedToken, recoveryEpoch);
+        }
+        await diagnostics.report(pairedToken, sourceID, { failure: syncFailureCode(error) });
+      }
       await activeAppServer?.close();
       activeAppServer = undefined;
       await sleep(restartDelay);
@@ -981,13 +1042,14 @@ function currentLeaderOwner() {
 }
 
 function acquireLeadership() {
-  if (shuttingDown || isLeader) return;
+  if (shuttingDown || retiringForUpgrade || isLeader) return;
   try {
     fs.mkdirSync(leaderDir, { mode: 0o700 });
     fs.writeFileSync(
       leaderOwnerPath,
       JSON.stringify({
         protocol_version: DAEMON_PROTOCOL_VERSION,
+        plugin_version: runningPluginIdentity.version,
         token: ownerToken,
         pid: process.pid
       }),
@@ -998,6 +1060,7 @@ function acquireLeadership() {
     try {
       const owner = currentLeaderOwner();
       const disposition = daemonLeaseDisposition(owner, {
+        pluginVersion: runningPluginIdentity.version,
         age: owner ? fileAge(leaderOwnerPath) : fileAge(leaderDir),
         staleMilliseconds: LEADER_STALE_MS,
         processIsAlive
@@ -1012,6 +1075,7 @@ function acquireLeadership() {
   }
 
   isLeader = true;
+  mirrorLegacyPluginLease(dataDir, previousDataDir, "native-pins-sync-leader");
   leaderHeartbeatTimer = setInterval(() => {
     const owner = currentLeaderOwner();
     if (owner?.token !== ownerToken) {
@@ -1021,6 +1085,7 @@ function acquireLeadership() {
     try {
       const now = new Date();
       fs.utimesSync(leaderOwnerPath, now, now);
+      mirrorLegacyPluginLease(dataDir, previousDataDir, "native-pins-sync-leader");
     } catch {
       releaseLeadership(false);
     }
@@ -1044,6 +1109,7 @@ function startFollowerMaintenance({
 function releaseLeadership(removeLease = true) {
   if (!isLeader) return Promise.resolve();
   isLeader = false;
+  desktopQuestions.close();
   clearInterval(leaderHeartbeatTimer);
   leaderHeartbeatTimer = undefined;
   const closingClients = [];
@@ -1057,6 +1123,24 @@ function releaseLeadership(removeLease = true) {
     }
   }
   return Promise.allSettled(closingClients);
+}
+
+function retireForUpgrade() {
+  if (retiringForUpgrade || shuttingDown) return;
+  retiringForUpgrade = true;
+  clearInterval(followerTimer);
+  void releaseLeadership(false);
+  releaseDaemonLease();
+  // Stop accepting new instructions, but preserve any app-server that owns an
+  // already submitted headless turn until its normal terminal notification.
+  void directInstructionEndpoint?.close().catch(() => {});
+  const finish = () => {
+    if (instructionOwnerCapacity.activeCount > 0 || instructionOwnerClients.size > 0) return;
+    clearInterval(drain);
+    shutdown(0);
+  };
+  const drain = setInterval(finish, 250);
+  finish();
 }
 
 function shutdown(exitCode) {

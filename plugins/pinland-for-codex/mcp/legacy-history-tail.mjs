@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import { parseAsyncQuestionReply } from "./desktop-async-questions.mjs";
 
 import {
   boundLiveProgress,
@@ -37,6 +38,8 @@ function cleanText(value) {
 }
 
 function userDisplayText(text) {
+  const replies = parseAsyncQuestionReply([{ type: "text", text }]);
+  if (replies) return replies.map(r => r.answer).join("\n\n");
   const requestMarker = /(?:^|\n)## My request(?: for Codex)?:\s*\n/u;
   const marker = requestMarker.exec(text);
   const request = marker

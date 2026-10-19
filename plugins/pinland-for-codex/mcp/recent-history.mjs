@@ -82,6 +82,8 @@ function cleanItemID(value) {
 
 function textFromUserMessage(item) {
   if (item?.type !== "userMessage" || !Array.isArray(item.content)) return "";
+  const replies = parseAsyncQuestionReply(item.content);
+  if (replies) return replies.map(r => r.answer).join("\n\n");
   return item.content
     .filter((part) => part?.type === "text")
     .map((part) => cleanText(part.text))
@@ -792,3 +794,4 @@ export async function attachRecentMessages(sessions, cache, fetchTurns, {
     };
   });
 }
+import { parseAsyncQuestionReply } from "./desktop-async-questions.mjs";

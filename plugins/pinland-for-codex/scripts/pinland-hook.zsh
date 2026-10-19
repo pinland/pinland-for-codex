@@ -2,8 +2,9 @@
 
 # Pinland never edits Codex configuration. Codex runs this trusted plugin hook,
 # whose private state lives under Codex's plugin-data directory and which talks
-# only to Pinland's loopback listener. Any failure exits without a decision so
-# Codex keeps its native behavior.
+# only to Pinland's loopback listener. Lifecycle failures make no decision;
+# the exact, explicit manual-pin action reports a bounded failure instead of
+# silently spending a model turn on an operation that was not confirmed.
 
 set -u
 set -o pipefail
@@ -49,18 +50,26 @@ case "$mode" in
     ;;
 esac
 
+function pinland_failure() {
+  if [[ "$mode" == "manual-pin" ]]; then
+    # All arguments are fixed strings below, never prompts, paths or raw errors.
+    /usr/bin/printf '{"decision":"block","reason":"Pinland could not confirm adding this task. %s (%s). No permission settings were changed."}\n' "$2" "$1"
+  fi
+  exit 0
+}
+
 if [[ -n "${PLUGIN_DATA:-}" ]]; then
   data_dir="$PLUGIN_DATA"
 else
   readonly user_home="${HOME:-}"
   if [[ -z "$user_home" ]]; then
-    exit 0
+    pinland_failure CX-PIN-STATE 'Plugin storage is unavailable'
   fi
   readonly codex_home="${CODEX_HOME:-$user_home/.codex}"
   data_dir="$codex_home/plugin-data/pinland-for-codex"
 fi
 readonly data_dir
-/bin/mkdir -p "$data_dir" 2>/dev/null || exit 0
+/bin/mkdir -p "$data_dir" 2>/dev/null || pinland_failure CX-PIN-STATE 'Plugin storage is not writable'
 /bin/chmod 700 "$data_dir" 2>/dev/null || true
 
 # Native pin changes do not emit a lifecycle hook. Keep one detached,
@@ -82,7 +91,7 @@ readonly token_file="$data_dir/bridge-token"
 if [[ ! -s "$token_file" ]]; then
   readonly generated_token="$(/usr/bin/openssl rand -hex 32 2>/dev/null)"
   if [[ ${#generated_token} -ne 64 ]]; then
-    exit 0
+    pinland_failure CX-PIN-STATE 'Could not prepare the local connection credential'
   fi
   (
     set -o noclobber
@@ -93,7 +102,7 @@ fi
 
 readonly token="$(/bin/cat "$token_file" 2>/dev/null)"
 if [[ ${#token} -ne 64 ]]; then
-  exit 0
+  pinland_failure CX-PIN-STATE 'The local connection credential is unavailable'
 fi
 
 function wake_pinland() {
@@ -120,7 +129,7 @@ function curl_status() {
 
 readonly response_file="$(/usr/bin/mktemp "$data_dir/response.XXXXXX" 2>/dev/null)"
 if [[ -z "$response_file" ]]; then
-  exit 0
+  pinland_failure CX-PIN-STATE 'Could not prepare the local response file'
 fi
 trap '/bin/rm -f "$response_file"' EXIT
 
@@ -150,7 +159,7 @@ if [[ ! -f "$data_dir/paired" ]]; then
     /bin/sleep 0.15
   done
   if [[ "$pair_status" != "204" ]]; then
-    exit 0
+    pinland_failure CX-PIN-PAIRING 'The local plugin connection has not been confirmed'
   fi
   umask 077
   : > "$data_dir/paired"
@@ -167,12 +176,12 @@ if [[ "$did_wake" -eq 1 ]]; then
     [[ "$health_status" == "204" ]] && break
     if [[ "$health_status" == "401" ]]; then
       /bin/rm -f "$data_dir/paired"
-      exit 0
+      pinland_failure CX-PIN-AUTH 'The local connection credential was rejected'
     fi
     /bin/sleep 0.1
   done
   if [[ "$health_status" != "204" ]]; then
-    exit 0
+    pinland_failure CX-PIN-BRIDGE 'The local Pinland service did not respond'
   fi
 fi
 
@@ -209,7 +218,14 @@ done
 
 if [[ "$http_status" == "401" ]]; then
   /bin/rm -f "$data_dir/paired"
-  exit 0
+  pinland_failure CX-PIN-AUTH 'The local connection credential was rejected'
+fi
+
+if [[ "$mode" == "manual-pin" ]]; then
+  decision="$(/usr/bin/plutil -extract decision raw -o - "$response_file" 2>/dev/null)"
+  if [[ "$http_status" != "200" || "$decision" != "block" ]]; then
+    pinland_failure CX-PIN-UNCONFIRMED 'The add-task acknowledgement was not received'
+  fi
 fi
 
 if [[ "$http_status" == "200" && -s "$response_file" ]]; then

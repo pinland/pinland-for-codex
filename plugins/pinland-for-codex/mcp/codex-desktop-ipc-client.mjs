@@ -115,6 +115,8 @@ export class CodexDesktopIPCClient {
     this.clientID = INITIAL_CLIENT_ID;
     this.buffer = Buffer.alloc(0);
     this.pending = new Map();
+    this.onBroadcast = options.onBroadcast;
+    this.onDisconnect = options.onDisconnect;
   }
 
   async start() {
@@ -298,6 +300,10 @@ export class CodexDesktopIPCClient {
   }
 
   handleMessage(message) {
+    if (message?.type === "broadcast") {
+      this.onBroadcast?.(message);
+      return;
+    }
     if (message?.type === "response") {
       const pending = this.pending.get(message.requestId);
       if (!pending) return;
@@ -355,6 +361,7 @@ export class CodexDesktopIPCClient {
       pending.reject(error);
     }
     this.pending.clear();
+    this.onDisconnect?.();
   }
 
   close() {

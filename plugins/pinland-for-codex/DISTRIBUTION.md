@@ -2,17 +2,10 @@
 
 `pinland-for-codex` is the package namespace, not a public installation URL.
 OpenAI assigns the actual listing URL only after directory review. Until that
-URL exists, this GitHub repository is the supported fallback marketplace:
-
-```bash
-codex plugin marketplace add pinland/pinland-for-codex
-codex plugin add pinland-for-codex@pinland
-```
-
-Pinland's **Install & Connect** button opens Codex's standard plugin screen for
-the signed snapshot bundled with the app. The user must still review and
-confirm once; Pinland must not claim installation completed before that Codex
-confirmation.
+URL exists, Pinland's **Install & Connect** button opens Codex's standard
+plugin screen for the signed snapshot bundled with the app. The user must still
+review and confirm once; Pinland must not claim installation completed before
+that Codex confirmation.
 
 Before enabling the feature in an App Store release:
 

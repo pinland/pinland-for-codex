@@ -1,3 +1,13 @@
+// Version 37 fences sync by runtime identity and compares package versions for
+// same-protocol handovers. Replaced daemons drain owned tasks before exiting.
+// Version 36 discovers packaged Codex executables and reports before bootstrap.
+// Version 35 adds runtime identity, targeted plugin updates and account usage.
+// Usage must also advance the lease: otherwise an old daemon can keep the sync
+// channel forever even after Codex has loaded the newly installed package.
+// Version 34 tightens question schemas and native receipt gating.
+// Version 33 also supports asynchronous Desktop questions and native steer receipts.
+// Version 32 relays native Desktop questions to the pinned-task question card.
+// Version 31 reports native-pin sync health and allowlisted failures to settings.
 // Version 30 adds a Codex-hosted cross-task provider between Desktop owner
 // routing and the temporary app-server fallback. Idle tasks whose stale owner
 // does not answer discovery can now receive a message without colliding with
@@ -52,7 +62,12 @@
 // Leadership remains monotonic because multiple Codex tasks can retain
 // an older plugin process after an update; those followers must never steal
 // the lease back from a newer daemon and revive stale snapshot semantics.
-export const DAEMON_PROTOCOL_VERSION = 30;
+export const DAEMON_PROTOCOL_VERSION = 37;
+
+// Versioned ownership handles ordinary package updates too, without requiring a
+// protocol bump for every release. Older (unversioned) readers still respect the
+// protocol high-water mark and cannot steal a healthy newer lease back.
+import { comparePluginVersions } from "./plugin-update.mjs";
 
 export function daemonLeaseDisposition(owner, options) {
   const age = options.age;
@@ -65,6 +80,8 @@ export function daemonLeaseDisposition(owner, options) {
     return "keep";
   }
   if (ownerIsHealthy && owner.protocol_version === DAEMON_PROTOCOL_VERSION) {
+    if (options.pluginVersion && comparePluginVersions(owner.plugin_version, options.pluginVersion) === -1) return "replace";
+    if (options.pluginVersion && !owner.plugin_version) return "replace";
     return "keep";
   }
   if (!owner && age <= staleMilliseconds) return "wait";

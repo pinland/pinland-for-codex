@@ -12,8 +12,17 @@ const options = {
   processIsAlive: () => true
 };
 
-test("the current daemon protocol is version thirty", () => {
-  assert.equal(DAEMON_PROTOCOL_VERSION, 30);
+test("the current daemon protocol takes over from pre-usage companions", () => {
+  assert.equal(DAEMON_PROTOCOL_VERSION, 37);
+});
+
+test("same-protocol upgrades compare package versions and are monotonic", () => {
+  const old = "0.1.0+codex.20261008000000", newer = "0.1.0+codex.20261009000000";
+  const owner = { protocol_version: DAEMON_PROTOCOL_VERSION, token: "owner", pid: 44, plugin_version: old };
+  assert.equal(daemonLeaseDisposition(owner, { ...options, pluginVersion: newer }), "replace");
+  assert.equal(daemonLeaseDisposition({ ...owner, plugin_version: newer }, { ...options, pluginVersion: old }), "keep");
+  assert.equal(daemonLeaseDisposition(owner, { ...options, pluginVersion: old }), "keep");
+  assert.equal(daemonLeaseDisposition({ ...owner, plugin_version: undefined }, { ...options, pluginVersion: newer }), "replace");
 });
 
 test("a live older daemon lease is replaced during upgrade", () => {

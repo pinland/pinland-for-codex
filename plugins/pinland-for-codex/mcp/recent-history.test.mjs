@@ -20,6 +20,13 @@ import {
   truncateUTF8
 } from "./recent-history.mjs";
 
+test("native asynchronous answers display only the human answer", () => {
+  const result = extractRecentMessages({ data: [{ id: "turn", items: [{ type: "userMessage", content: [{ type: "text",
+    text: '<send_user_message_question_reply>\n[{"questionItemId":"q","question":"Language?","answer":"中文回答"}]\n</send_user_message_question_reply>'
+  }] }] }] });
+  assert.equal(result[0].text, "中文回答");
+});
+
 test("recent turns request asks Codex for five summarized newest turns", () => {
   assert.deepEqual(recentTurnsListParams("thread-1"), {
     threadId: "thread-1",

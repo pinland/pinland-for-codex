@@ -230,7 +230,7 @@ test("v2 approval requests normalize to a bounded bridge protocol", () => {
       threadId: "thread-2",
       turnId: "turn-2",
       itemId: "item-2",
-      grantRoot: "/Users/example/projects/Pinland"
+      grantRoot: "/Users/zen/projects/Pinland"
     }
   }), {
     schema_version: 1,
@@ -238,7 +238,7 @@ test("v2 approval requests normalize to a bounded bridge protocol", () => {
     turn_id: "turn-2",
     kind: "file_change",
     tool_name: "apply_patch",
-    summary: "Allow file changes under /Users/example/projects/Pinland"
+    summary: "Allow file changes under /Users/zen/projects/Pinland"
   });
 
   assert.deepEqual(normalizeApprovalRequest({

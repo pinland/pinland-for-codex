@@ -69,6 +69,27 @@ test("marketplace data adopts a proven pairing from the previous Codex path", (t
   assert.equal(fs.statSync(path.join(dataDir, "paired")).mode & 0o777, 0o600);
 });
 
+test("invocations without PLUGIN_DATA reuse the securely paired native directory", t => {
+  const root = temporaryDirectory(t);
+  const codexHome = path.join(root, "codex");
+  const native = path.join(codexHome, "plugins/data/pinland-for-codex-pinland");
+  const legacy = path.join(codexHome, "plugin-data/pinland-for-codex");
+  const env = { CODEX_HOME: codexHome, HOME: root };
+  fs.mkdirSync(native, { recursive: true, mode: 0o700 });
+  fs.writeFileSync(path.join(native, "bridge-token"), "ab".repeat(32), { mode: 0o600 });
+  assert.equal(resolvePluginDataDirectory(env), legacy, "an unpaired directory cannot recreate a connection");
+  fs.writeFileSync(path.join(native, "paired"), "", { mode: 0o600 });
+  assert.equal(resolvePluginDataDirectory(env), native);
+  assert.equal(resolvePluginDataDirectory({ ...env, PLUGIN_DATA: "/explicit" }), "/explicit");
+  fs.chmodSync(path.join(native, "bridge-token"), 0o644);
+  assert.equal(resolvePluginDataDirectory(env), legacy, "unsafe credentials cannot redirect a daemon");
+  fs.chmodSync(path.join(native, "bridge-token"), 0o600);
+  const alias = native + ".actual";
+  fs.renameSync(native, alias);
+  fs.symlinkSync(alias, native);
+  assert.equal(resolvePluginDataDirectory(env), legacy);
+});
+
 test("an existing marketplace pairing is never replaced by previous data", (t) => {
   const root = temporaryDirectory(t);
   const codexHome = path.join(root, "codex");
