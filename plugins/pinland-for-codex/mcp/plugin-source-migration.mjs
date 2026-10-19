@@ -7,7 +7,10 @@ const run = promisify(execFile);
 const PLUGIN = "pinland-for-codex";
 const ID = `${PLUGIN}@pinland`;
 const SUFFIX = "/Contents/Resources/Integrations/.agents/plugins/marketplace.json";
-const REQUIREMENT = '=anchor apple generic and identifier "com.zeenzhao.pinland" and certificate leaf[subject.OU] = "KDG9SYMY48"';
+// App Store deliveries are re-signed by Apple, so the leaf certificate's OU
+// is no longer the publisher's team. Keep the Apple anchor and exact bundle
+// identity; the Store branch must also prove the publisher's signed entitlement.
+export const PINLAND_APP_REQUIREMENT = '=anchor apple generic and identifier "com.zeenzhao.pinland" and (certificate leaf[subject.OU] = "KDG9SYMY48" or (certificate leaf[field.1.2.840.113635.100.6.1.9] exists and entitlement["com.apple.developer.team-identifier"] = "KDG9SYMY48"))';
 
 export function validMarketplacePath(value) {
   return typeof value === "string" && value.length <= 4096 && path.isAbsolute(value)
@@ -69,7 +72,7 @@ export async function verifyPinlandMarketplace(target, options = {}) {
     if (fs.realpathSync(marketplaceRoot(file)) !== path.join(realApp, "Contents/Resources/Integrations")
         || !sealedPluginTree(path.join(marketplaceRoot(file), "plugins", PLUGIN))) return false;
     const inspect = options.verifySignature || (async appPath => {
-      await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R", REQUIREMENT, appPath],
+      await run("/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R", PINLAND_APP_REQUIREMENT, appPath],
         { timeout: 10_000, maxBuffer: 16_384 });
       return true;
     });
